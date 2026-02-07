@@ -1,0 +1,4 @@
+# Install required packages
+pip install streamlit pandas plotly
+
+# Run the application
