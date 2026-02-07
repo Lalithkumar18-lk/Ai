@@ -5,8 +5,6 @@ import json
 import random
 import time
 from typing import List, Dict, Optional
-import plotly.graph_objects as go
-import plotly.express as px
 
 # Initialize session state
 if 'cases' not in st.session_state:
@@ -196,7 +194,6 @@ ADVOCACY_TEMPLATES = {
 
 # Sidebar
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2092/2092683.png", width=80)
     st.title("🤖 AI Ethics Case Management")
     
     st.markdown("---")
@@ -209,9 +206,11 @@ with st.sidebar:
     st.subheader("📊 Live Stats")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Active Cases", len([c for c in st.session_state.cases if c.status != "resolved"]))
+        active_cases = len([c for c in st.session_state.cases if c.status != "resolved"])
+        st.metric("Active Cases", active_cases)
     with col2:
-        st.metric("Urgent", len([c for c in st.session_state.cases if c.priority == "urgent" and c.status != "resolved"]))
+        urgent_cases = len([c for c in st.session_state.cases if c.priority == "urgent" and c.status != "resolved"])
+        st.metric("Urgent Cases", urgent_cases)
     
     st.markdown("---")
     
@@ -363,19 +362,18 @@ with tab2:  # Case Details
                     days_open = (datetime.datetime.now() - case.created_at).days
                     st.metric("Days Open", days_open)
                 
-                # Timeline visualization
+                # Timeline visualization using DataFrame
                 st.markdown("### 📅 Case Timeline")
                 timeline_data = pd.DataFrame({
                     'Event': ['Case Opened', 'Initial Review', 'Investigation', 'Current'],
                     'Date': [
-                        case.created_at,
-                        case.created_at + datetime.timedelta(hours=2),
-                        case.created_at + datetime.timedelta(days=1),
-                        datetime.datetime.now()
+                        case.created_at.strftime("%Y-%m-%d"),
+                        (case.created_at + datetime.timedelta(hours=2)).strftime("%Y-%m-%d"),
+                        (case.created_at + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
+                        datetime.datetime.now().strftime("%Y-%m-%d")
                     ]
                 })
-                timeline_data['Days Since Start'] = (timeline_data['Date'] - case.created_at).dt.days
-                st.line_chart(timeline_data.set_index('Event')['Days Since Start'])
+                st.dataframe(timeline_data, use_container_width=True)
             
             with col2:
                 st.subheader("🛠️ Quick Actions")
@@ -513,7 +511,6 @@ with tab3:  # Live Resolution
                             "time": datetime.datetime.now().strftime("%H:%M")
                         })
                         
-                        # AI response logic here
                         st.rerun()
             
             # Resolution progress
@@ -525,12 +522,6 @@ with tab3:  # Live Resolution
                                    "Solution Design", "Implementation", "Verification"]
                 
                 current_step = min(len(case.chat_history) // 3, len(resolution_steps) - 1)
-                
-                progress_df = pd.DataFrame({
-                    'Step': resolution_steps,
-                    'Status': ['completed' if i < current_step else 'current' if i == current_step else 'pending' 
-                              for i in range(len(resolution_steps))]
-                })
                 
                 # Create progress bar
                 progress = (current_step / (len(resolution_steps) - 1)) * 100
@@ -571,23 +562,27 @@ with tab4:  # Analytics
             resolution_rate = len([c for c in st.session_state.cases if c.status == "resolved"]) / len(st.session_state.cases) * 100
             st.metric("Resolution Rate", f"{resolution_rate:.1f}%")
         
-        # Charts
+        # Charts using Streamlit built-in
         col_chart1, col_chart2 = st.columns(2)
         
         with col_chart1:
             st.subheader("📊 Cases by Category")
             category_counts = cases_df['category'].value_counts()
-            fig1 = px.pie(values=category_counts.values, names=category_counts.index)
-            st.plotly_chart(fig1, use_container_width=True)
+            # Create a simple bar chart
+            st.bar_chart(category_counts)
+            # Also show as table
+            with st.expander("View Category Data"):
+                st.dataframe(category_counts)
         
         with col_chart2:
             st.subheader("📈 Cases by Priority")
             priority_counts = cases_df['priority'].value_counts()
-            fig2 = px.bar(x=priority_counts.index, y=priority_counts.values, 
-                         color=priority_counts.index,
-                         color_discrete_map={'urgent': 'red', 'high': 'orange', 
-                                           'medium': 'blue', 'low': 'green'})
-            st.plotly_chart(fig2, use_container_width=True)
+            # Create dataframe for bar chart
+            priority_df = pd.DataFrame({
+                'Priority': priority_counts.index,
+                'Count': priority_counts.values
+            })
+            st.bar_chart(priority_df.set_index('Priority'))
         
         # Time-based analysis
         st.subheader("⏱️ Resolution Time Analysis")
@@ -602,16 +597,28 @@ with tab4:  # Analytics
             if not resolved_cases.empty:
                 resolved_cases['resolution_hours'] = (resolved_cases['updated_at'] - resolved_cases['created_at']).dt.total_seconds() / 3600
                 
-                fig3 = px.histogram(resolved_cases, x='resolution_hours', 
-                                   nbins=10, title='Resolution Time Distribution')
-                st.plotly_chart(fig3, use_container_width=True)
+                # Show statistics
+                st.write(f"**Average Resolution Time:** {resolved_cases['resolution_hours'].mean():.1f} hours")
+                st.write(f"**Fastest Resolution:** {resolved_cases['resolution_hours'].min():.1f} hours")
+                st.write(f"**Slowest Resolution:** {resolved_cases['resolution_hours'].max():.1f} hours")
+                
+                # Show histogram using bar chart
+                hist_data = pd.cut(resolved_cases['resolution_hours'], bins=10)
+                hist_counts = hist_data.value_counts().sort_index()
+                st.bar_chart(hist_counts)
         
         # Platform analysis
         st.subheader("🖥️ Cases by Platform")
         platform_counts = cases_df['platform'].value_counts().head(10)
-        fig4 = px.bar(y=platform_counts.index, x=platform_counts.values, 
-                     orientation='h', title='Top Platforms with Issues')
-        st.plotly_chart(fig4, use_container_width=True)
+        
+        # Create horizontal bar chart using dataframe
+        platform_df = pd.DataFrame({
+            'Platform': platform_counts.index,
+            'Cases': platform_counts.values
+        })
+        # Reorder for horizontal display
+        platform_df = platform_df.sort_values('Cases', ascending=True)
+        st.bar_chart(platform_df.set_index('Platform'))
         
         # Real-time updates
         st.markdown("---")
@@ -649,7 +656,7 @@ with tab5:  # Advocacy Center
     with col_adv1:
         st.markdown("### 🎯 Strategic Advocacy Planning")
         
-        # Current issues heatmap
+        # Current issues visualization
         st.markdown("#### 🔥 Current AI Ethics Hotspots")
         
         issues_data = pd.DataFrame({
@@ -659,10 +666,18 @@ with tab5:  # Advocacy Center
             'Media Attention': [85, 70, 95, 60, 75, 65]
         })
         
-        fig = px.scatter(issues_data, x='Media Attention', y='Severity', 
-                        size='Severity', color='Issue', hover_name='Issue',
-                        title='AI Ethics Issues Heatmap')
-        st.plotly_chart(fig, use_container_width=True)
+        # Create a scatter plot using Streamlit's dataframe display
+        st.write("**Hotspots Matrix:**")
+        st.dataframe(issues_data, use_container_width=True)
+        
+        # Simple visualization using metric cards
+        st.markdown("#### 📊 Issue Priority Matrix")
+        for idx, row in issues_data.iterrows():
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(f"**{row['Issue']}**")
+            with col2:
+                st.metric("Severity", row['Severity'])
         
         # Advocacy campaign builder
         st.markdown("### 🛠️ Build Advocacy Campaign")
@@ -696,7 +711,6 @@ with tab5:  # Advocacy Center
         
         if st.button("🚀 Launch Campaign"):
             st.success(f"Campaign '{campaign_name}' launched with {len(selected_actions)} actions!")
-            # Here you would save the campaign to a database
     
     with col_adv2:
         st.markdown("### 📊 Advocacy Metrics")
@@ -736,7 +750,6 @@ with tab5:  # Advocacy Center
         
         for item in feed_items:
             st.info(f"📢 {item}")
-            time.sleep(0.1)
 
 # Footer
 st.markdown("---")
