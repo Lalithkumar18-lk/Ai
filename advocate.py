@@ -1,769 +1,832 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import json
 import random
 import time
+import json
 from typing import List, Dict, Optional
 
 # Initialize session state
-if 'cases' not in st.session_state:
-    st.session_state.cases = []
-if 'case_counter' not in st.session_state:
-    st.session_state.case_counter = 1000
-if 'analytics' not in st.session_state:
-    st.session_state.analytics = {
-        'cases_handled': 0,
-        'avg_resolution_time': 0,
-        'satisfaction_score': 0
+if 'advocacy_cases' not in st.session_state:
+    st.session_state.advocacy_cases = []
+if 'human_rights_violations' not in st.session_state:
+    st.session_state.human_rights_violations = []
+if 'impact_metrics' not in st.session_state:
+    st.session_state.impact_metrics = {
+        'people_protected': 0,
+        'policies_influenced': 0,
+        'awareness_campaigns': 0,
+        'legal_interventions': 0
     }
 
 # Page configuration
 st.set_page_config(
-    page_title="AI Ethics Case Management",
-    page_icon="⚖️",
+    page_title="Human AI Advocate",
+    page_icon="🤝",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS for human-centered design
 st.markdown("""
 <style>
-    .case-urgent { background-color: #fee; border-left: 5px solid #e74c3c; padding: 10px; border-radius: 5px; margin: 5px 0; }
-    .case-high { background-color: #fef9e7; border-left: 5px solid #f39c12; padding: 10px; border-radius: 5px; margin: 5px 0; }
-    .case-medium { background-color: #e8f4fc; border-left: 5px solid #3498db; padding: 10px; border-radius: 5px; margin: 5px 0; }
-    .case-low { background-color: #eafaf1; border-left: 5px solid #27ae60; padding: 10px; border-radius: 5px; margin: 5px 0; }
+    /* Human-centered theme colors */
+    :root {
+        --human-blue: #1a73e8;
+        --human-green: #0d9d58;
+        --human-red: #ea4335;
+        --human-yellow: #fbbc04;
+        --human-purple: #673ab7;
+    }
     
-    .status-open { color: #e74c3c; font-weight: bold; }
-    .status-investigating { color: #f39c12; font-weight: bold; }
-    .status-resolved { color: #27ae60; font-weight: bold; }
-    .status-escalated { color: #8e44ad; font-weight: bold; }
-    
-    .chat-user { background-color: #e3f2fd; padding: 10px; border-radius: 10px; margin: 5px 0; max-width: 80%; float: right; clear: both; }
-    .chat-ai { background-color: #f5f5f5; padding: 10px; border-radius: 10px; margin: 5px 0; max-width: 80%; float: left; clear: both; }
-    
-    .metric-card {
-        background: white;
+    .human-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
         padding: 20px;
+        border-radius: 15px;
+        margin: 10px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .rights-violation {
+        background-color: #ffebee;
+        border-left: 5px solid #f44336;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    
+    .success-story {
+        background-color: #e8f5e9;
+        border-left: 5px solid #4caf50;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    
+    .advocacy-action {
+        background-color: #e3f2fd;
+        border-left: 5px solid #2196f3;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    
+    .human-metric {
+        background: white;
+        padding: 15px;
         border-radius: 10px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        margin: 10px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
+        border-top: 4px solid var(--human-blue);
     }
     
-    .real-time-alert {
-        animation: blink 1s infinite;
+    .urgent-alert {
+        animation: pulse 2s infinite;
         background-color: #fff3cd;
-        border: 1px solid #ffeaa7;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px 0;
+        border: 2px solid #ffc107;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 15px 0;
     }
     
-    @keyframes blink {
-        0%, 100% { opacity: 1; }
+    @keyframes pulse {
+        0% { opacity: 1; }
         50% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+    
+    .chat-human {
+        background-color: #e3f2fd;
+        padding: 12px;
+        border-radius: 15px 15px 0 15px;
+        margin: 8px 0;
+        max-width: 70%;
+        margin-left: auto;
+    }
+    
+    .chat-ai {
+        background-color: #f5f5f5;
+        padding: 12px;
+        border-radius: 15px 15px 15px 0;
+        margin: 8px 0;
+        max-width: 70%;
+    }
+    
+    .impact-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8em;
+        font-weight: bold;
+        margin: 2px;
+    }
+    
+    .impact-high { background-color: #ffebee; color: #c62828; }
+    .impact-medium { background-color: #fff3e0; color: #ef6c00; }
+    .impact-low { background-color: #e8f5e9; color: #2e7d32; }
+    
+    .stButton > button {
+        background-color: var(--human-blue);
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: bold;
+        transition: all 0.3s;
+    }
+    
+    .stButton > button:hover {
+        background-color: #0d47a1;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Case Data Models
-class AICase:
-    def __init__(self, case_id: str, title: str, description: str, category: str, 
-                 priority: str, reported_by: str, platform: str = "Unknown"):
+# Data Models
+class HumanAdvocacyCase:
+    def __init__(self, case_id: str, title: str, description: str, 
+                 human_right_affected: str, ai_system: str, severity: str):
         self.id = case_id
         self.title = title
         self.description = description
-        self.category = category
-        self.priority = priority  # "urgent", "high", "medium", "low"
-        self.status = "open"
-        self.reported_by = reported_by
-        self.platform = platform
+        self.human_right_affected = human_right_affected
+        self.ai_system = ai_system
+        self.severity = severity  # "critical", "high", "medium", "low"
+        self.status = "reported"
         self.created_at = datetime.datetime.now()
         self.updated_at = datetime.datetime.now()
-        self.resolution = ""
+        self.people_affected = random.randint(100, 100000)
         self.advocacy_actions = []
-        self.chat_history = []
-        self.assigned_to = ""
-        self.severity_score = random.randint(1, 100)
-        self.affected_users = random.randint(100, 10000)
+        self.success_stories = []
+        self.assigned_advocate = ""
+        self.resolution = ""
         
     def to_dict(self):
         return {
             "id": self.id,
             "title": self.title,
-            "description": self.description,
-            "category": self.category,
-            "priority": self.priority,
+            "human_right": self.human_right_affected,
+            "ai_system": self.ai_system,
+            "severity": self.severity,
             "status": self.status,
-            "reported_by": self.reported_by,
-            "platform": self.platform,
-            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
-            "severity_score": self.severity_score,
-            "affected_users": self.affected_users,
-            "resolution": self.resolution,
-            "advocacy_actions": self.advocacy_actions,
-            "assigned_to": self.assigned_to
+            "people_affected": self.people_affected,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M"),
+            "advocacy_actions": len(self.advocacy_actions),
+            "resolution": self.resolution
         }
 
-# Predefined cases
-PREDEFINED_CASES = [
-    {
-        "title": "Algorithmic Bias in Hiring Platform",
-        "description": "AI recruiting tool showing significant gender bias, favoring male candidates over equally qualified female candidates in tech roles.",
-        "category": "Bias & Discrimination",
-        "priority": "urgent",
-        "platform": "TechHire AI",
-        "affected_demo": "Women in tech"
-    },
-    {
-        "title": "Healthcare AI Misdiagnosis",
-        "description": "Medical diagnostic AI incorrectly diagnosing rare diseases, leading to delayed treatment for 200+ patients.",
-        "category": "Healthcare Safety",
-        "priority": "urgent",
-        "platform": "MedScan AI",
-        "affected_demo": "Patients with rare diseases"
-    },
-    {
-        "title": "Facial Recognition False Positives",
-        "description": "Law enforcement facial recognition system misidentifying individuals, disproportionately affecting minority communities.",
-        "category": "Privacy & Surveillance",
-        "priority": "high",
-        "platform": "SafeCity AI",
-        "affected_demo": "Minority communities"
-    },
-    {
-        "title": "Social Media Recommendation Harm",
-        "description": "AI recommendation algorithm promoting harmful content to teenagers, linked to mental health issues.",
-        "category": "Content Moderation",
-        "priority": "high",
-        "platform": "SocialFlow",
-        "affected_demo": "Teenagers"
-    },
-    {
-        "title": "Autonomous Vehicle Ethics Dilemma",
-        "description": "Self-driving car algorithm showing inconsistent decision-making in accident scenarios, raising ethical concerns.",
-        "category": "Autonomous Systems",
-        "priority": "medium",
-        "platform": "AutoDrive Inc",
-        "affected_demo": "General public"
-    },
-    {
-        "title": "Financial AI Loan Discrimination",
-        "description": "AI loan approval system systematically denying applications from certain zip codes, perpetuating historical redlining.",
-        "category": "Financial Equity",
-        "priority": "urgent",
-        "platform": "FinTech Solutions",
-        "affected_demo": "Low-income neighborhoods"
-    }
+class HumanRightsViolation:
+    def __init__(self, violation_id: str, right: str, ai_system: str, 
+                 description: str, region: str, evidence_level: str):
+        self.id = violation_id
+        self.right = right
+        self.ai_system = ai_system
+        self.description = description
+        self.region = region
+        self.evidence_level = evidence_level  # "documented", "suspected", "verified"
+        self.reported_date = datetime.datetime.now()
+        self.status = "active"
+        self.related_cases = []
+        
+# Human Rights Framework
+HUMAN_RIGHTS = [
+    "Right to Privacy",
+    "Right to Non-discrimination",
+    "Right to Freedom of Expression",
+    "Right to Fair Trial",
+    "Right to Work",
+    "Right to Health",
+    "Right to Education",
+    "Right to Cultural Participation",
+    "Right to Political Participation",
+    "Right to Security"
 ]
 
-# Advocacy Action Templates
-ADVOCACY_TEMPLATES = {
+# AI Systems affecting human rights
+AI_SYSTEMS = [
+    "Facial Recognition",
+    "Predictive Policing",
+    "Social Media Algorithms",
+    "Automated Hiring",
+    "Healthcare Diagnostics AI",
+    "Educational Assessment AI",
+    "Credit Scoring Algorithms",
+    "Content Moderation AI",
+    "Autonomous Weapons",
+    "Surveillance Systems"
+]
+
+# Advocacy Actions Database
+ADVOCACY_ACTIONS = {
     "Legal": [
-        "File regulatory complaint with relevant authority",
-        "Initiate class action lawsuit preparations",
-        "Request algorithmic transparency under GDPR/CCPA",
-        "Submit Freedom of Information Act request"
+        "File human rights complaint with UN",
+        "Initiate class action lawsuit",
+        "Submit to national human rights commission",
+        "Request judicial review",
+        "File amicus curiae brief"
     ],
-    "Media": [
-        "Prepare press release for media outlets",
-        "Contact investigative journalists",
-        "Draft op-ed for major newspapers",
-        "Create social media awareness campaign"
+    "Policy": [
+        "Draft legislation for AI regulation",
+        "Propose ethical AI guidelines",
+        "Lobby for algorithmic accountability laws",
+        "Advocate for AI impact assessments",
+        "Push for transparency requirements"
+    ],
+    "Public Awareness": [
+        "Launch public awareness campaign",
+        "Organize community workshops",
+        "Create educational materials",
+        "Host public forums",
+        "Develop media partnerships"
     ],
     "Technical": [
-        "Request independent algorithmic audit",
-        "Demand source code review",
-        "Propose third-party validation",
-        "Request bias mitigation implementation"
+        "Develop bias detection tools",
+        "Create algorithmic auditing framework",
+        "Design privacy-preserving alternatives",
+        "Build explainable AI interfaces",
+        "Create human-centered design guidelines"
     ],
-    "Community": [
-        "Organize community forum with affected individuals",
-        "Create online petition",
-        "Coordinate with advocacy groups",
-        "Host public awareness webinar"
-    ],
-    "Corporate": [
-        "Schedule meeting with company executives",
-        "Propose ethical AI review board",
-        "Demand public transparency report",
-        "Request immediate system suspension"
+    "Corporate Engagement": [
+        "Demand algorithmic transparency reports",
+        "Request human rights impact assessments",
+        "Propose ethical review boards",
+        "Advocate for user consent mechanisms",
+        "Push for grievance redressal systems"
     ]
 }
 
+# Success Stories Database
+SUCCESS_STORIES = [
+    {
+        "title": "Banned Discriminatory Hiring AI",
+        "description": "Successfully advocated for removal of biased AI that discriminated against women in tech hiring",
+        "people_impacted": "5000+ job seekers",
+        "year": 2023
+    },
+    {
+        "title": "Transparency in Facial Recognition",
+        "description": "Forced government to disclose facial recognition usage in public spaces",
+        "people_impacted": "2 million citizens",
+        "year": 2022
+    },
+    {
+        "title": "Healthcare AI Accountability",
+        "description": "Established oversight committee for medical diagnostic AI systems",
+        "people_impacted": "Healthcare patients nationwide",
+        "year": 2023
+    }
+]
+
 # Sidebar
 with st.sidebar:
-    st.title("🤖 AI Ethics Case Management")
+    st.markdown('<div class="human-card">', unsafe_allow_html=True)
+    st.title("🤝 Human AI Advocate")
+    st.markdown("Protecting human dignity in the age of AI")
+    st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("---")
-    
-    # Real-time alert
-    if random.random() > 0.7 and st.session_state.cases:
-        st.markdown('<div class="real-time-alert">🚨 New case update available!</div>', unsafe_allow_html=True)
     
     # Quick Stats
-    st.subheader("📊 Live Stats")
+    st.subheader("📊 Human Impact Stats")
+    
     col1, col2 = st.columns(2)
     with col1:
-        active_cases = len([c for c in st.session_state.cases if c.status != "resolved"])
-        st.metric("Active Cases", active_cases)
+        st.metric("Cases Active", len(st.session_state.advocacy_cases))
     with col2:
-        urgent_cases = len([c for c in st.session_state.cases if c.priority == "urgent" and c.status != "resolved"])
-        st.metric("Urgent Cases", urgent_cases)
+        st.metric("People Protected", st.session_state.impact_metrics['people_protected'])
     
     st.markdown("---")
     
-    # Quick Actions
-    st.subheader("⚡ Quick Actions")
+    # Report New Issue
+    st.subheader("🚨 Report New Issue")
+    
+    if st.button("📝 Report Human Rights Violation", use_container_width=True):
+        st.session_state.reporting_mode = True
+        st.rerun()
+    
     if st.button("🆕 Generate Test Case", use_container_width=True):
-        case_data = random.choice(PREDEFINED_CASES)
-        case_id = f"CASE-{st.session_state.case_counter}"
-        new_case = AICase(
+        # Generate a test case
+        case_id = f"HUM-{len(st.session_state.advocacy_cases) + 1000}"
+        rights = random.choice(HUMAN_RIGHTS)
+        systems = random.choice(AI_SYSTEMS)
+        
+        test_cases = [
+            f"Discriminatory {systems} affecting {rights}",
+            f"Privacy violation by {systems}",
+            f"Lack of transparency in {systems} impacting {rights}",
+            f"Algorithmic bias in {systems} violating {rights}"
+        ]
+        
+        new_case = HumanAdvocacyCase(
             case_id=case_id,
-            title=case_data["title"],
-            description=case_data["description"],
-            category=case_data["category"],
-            priority=case_data["priority"],
-            reported_by="System Generated",
-            platform=case_data["platform"]
+            title=random.choice(test_cases),
+            description=f"Documented case where {systems} system is negatively impacting {rights}. Evidence shows systematic violation affecting vulnerable populations.",
+            human_right_affected=rights,
+            ai_system=systems,
+            severity=random.choice(["critical", "high", "medium", "low"])
         )
-        st.session_state.cases.append(new_case)
-        st.session_state.case_counter += 1
-        st.session_state.analytics['cases_handled'] += 1
-        st.rerun()
-    
-    if st.button("📊 Update Analytics", use_container_width=True):
+        
+        st.session_state.advocacy_cases.append(new_case)
+        st.success("Test case generated!")
         st.rerun()
     
     st.markdown("---")
     
-    # Team Assignment
-    st.subheader("👥 Team")
-    team_members = ["Alex Chen", "Maria Garcia", "David Kim", "Sarah Johnson", "James Wilson"]
-    selected_assignee = st.selectbox("Assign to:", ["Unassigned"] + team_members)
+    # User Role
+    st.subheader("👤 Your Role")
+    user_role = st.selectbox(
+        "Select your advocacy role:",
+        ["Human Rights Advocate", "Legal Expert", "Policy Maker", 
+         "Affected Individual", "Researcher", "Concerned Citizen"]
+    )
+    
+    st.info(f"Role: {user_role}")
 
-# Main content
-st.markdown('<h1 class="main-header">⚖️ Real-Time AI Ethics Case Management System</h1>', unsafe_allow_html=True)
+# Main App
+st.markdown('<h1 style="text-align: center; color: #1a73e8;">🤝 Human AI Advocate Platform</h1>', unsafe_allow_html=True)
+st.markdown('<p style="text-align: center; font-size: 1.2rem;">Protecting Human Dignity in Artificial Intelligence Systems</p>', unsafe_allow_html=True)
 
 # Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📋 Case Dashboard", 
-    "🔍 Case Details", 
-    "💬 Live Resolution", 
-    "📈 Analytics", 
-    "📢 Advocacy Center"
+    "🏠 Dashboard", 
+    "🔍 Cases", 
+    "⚖️ Advocacy Toolkit", 
+    "📈 Impact Tracker", 
+    "💬 Human-Centered AI Chat"
 ])
 
-with tab1:  # Case Dashboard
-    st.subheader("🔄 Real-Time Case Monitoring")
+with tab1:  # Dashboard
+    st.subheader("🌍 Global Human Rights & AI Dashboard")
     
-    # Filters
+    # Real-time alerts
+    if st.session_state.advocacy_cases:
+        critical_cases = [c for c in st.session_state.advocacy_cases if c.severity == "critical"]
+        if critical_cases:
+            st.markdown(f'<div class="urgent-alert">🚨 {len(critical_cases)} CRITICAL human rights cases need immediate attention!</div>', unsafe_allow_html=True)
+    
+    # Human Impact Metrics
+    st.subheader("📊 Human Impact Metrics")
+    
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        filter_priority = st.selectbox("Priority", ["All", "urgent", "high", "medium", "low"])
+        st.markdown('<div class="human-metric">', unsafe_allow_html=True)
+        st.metric("👥 People Protected", f"{st.session_state.impact_metrics['people_protected']:,}+")
+        st.markdown('</div>', unsafe_allow_html=True)
+    
     with col2:
-        filter_status = st.selectbox("Status", ["All", "open", "investigating", "escalated", "resolved"])
+        st.markdown('<div class="human-metric">', unsafe_allow_html=True)
+        st.metric("📜 Policies Influenced", f"{st.session_state.impact_metrics['policies_influenced']}+")
+        st.markdown('</div>', unsafe_allow_html=True)
+    
     with col3:
-        filter_category = st.selectbox("Category", ["All", "Bias & Discrimination", "Healthcare Safety", 
-                                                  "Privacy & Surveillance", "Content Moderation", 
-                                                  "Autonomous Systems", "Financial Equity"])
+        st.markdown('<div class="human-metric">', unsafe_allow_html=True)
+        st.metric("📣 Awareness Campaigns", f"{st.session_state.impact_metrics['awareness_campaigns']}+")
+        st.markdown('</div>', unsafe_allow_html=True)
+    
     with col4:
-        filter_platform = st.text_input("Platform")
+        st.markdown('<div class="human-metric">', unsafe_allow_html=True)
+        st.metric("⚖️ Legal Interventions", f"{st.session_state.impact_metrics['legal_interventions']}+")
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    # Display cases
-    st.subheader("📋 Active Cases")
+    # Current Hotspots
+    st.subheader("🔥 Current Human Rights Hotspots")
     
-    filtered_cases = st.session_state.cases
+    hotspots_data = pd.DataFrame({
+        'Region': ['EU', 'USA', 'China', 'India', 'Brazil', 'Africa'],
+        'Active Cases': [12, 8, 15, 10, 7, 9],
+        'Most Affected Right': ['Privacy', 'Non-discrimination', 'Expression', 'Privacy', 'Work', 'Health']
+    })
     
-    if filter_priority != "All":
-        filtered_cases = [c for c in filtered_cases if c.priority == filter_priority]
+    st.dataframe(hotspots_data, use_container_width=True)
+    
+    # Success Stories
+    st.subheader("🌟 Recent Success Stories")
+    
+    for story in SUCCESS_STORIES[:2]:
+        st.markdown(f'''
+        <div class="success-story">
+            <h4>✅ {story['title']}</h4>
+            <p>{story['description']}</p>
+            <p><strong>Impact:</strong> {story['people_impacted']} | <strong>Year:</strong> {story['year']}</p>
+        </div>
+        ''', unsafe_allow_html=True)
+    
+    # Live Updates Feed
+    st.subheader("🔄 Live Human Rights Updates")
+    
+    updates = [
+        {"time": "Just now", "update": "New legislation proposed for AI transparency in healthcare"},
+        {"time": "5 min ago", "update": "Community forum organized on algorithmic bias"},
+        {"time": "1 hour ago", "update": "UN committee reviews AI human rights guidelines"},
+        {"time": "3 hours ago", "update": "Major tech company agrees to human rights audit"}
+    ]
+    
+    for update in updates:
+        st.info(f"🕒 {update['time']}: {update['update']}")
+
+with tab2:  # Cases
+    st.subheader("📋 Human Rights Advocacy Cases")
+    
+    # Filters
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        filter_right = st.selectbox("Filter by Human Right", ["All"] + HUMAN_RIGHTS)
+    with col2:
+        filter_severity = st.selectbox("Filter by Severity", ["All", "critical", "high", "medium", "low"])
+    with col3:
+        filter_status = st.selectbox("Filter by Status", ["All", "reported", "investigating", "advocating", "resolved"])
+    
+    # Cases Display
+    filtered_cases = st.session_state.advocacy_cases
+    
+    if filter_right != "All":
+        filtered_cases = [c for c in filtered_cases if c.human_right_affected == filter_right]
+    if filter_severity != "All":
+        filtered_cases = [c for c in filtered_cases if c.severity == filter_severity]
     if filter_status != "All":
         filtered_cases = [c for c in filtered_cases if c.status == filter_status]
-    if filter_category != "All":
-        filtered_cases = [c for c in filtered_cases if c.category == filter_category]
-    if filter_platform:
-        filtered_cases = [c for c in filtered_cases if filter_platform.lower() in c.platform.lower()]
     
-    for case in filtered_cases:
-        priority_class = f"case-{case.priority}"
-        
-        with st.container():
-            st.markdown(f"""
-            <div class="{priority_class}">
-                <h4>{case.title} <span class="status-{case.status}">[{case.status.upper()}]</span></h4>
-                <p><strong>Category:</strong> {case.category} | <strong>Platform:</strong> {case.platform}</p>
-                <p><strong>Reported:</strong> {case.created_at.strftime('%Y-%m-%d %H:%M')} | 
-                <strong>Affected Users:</strong> {case.affected_users:,}</p>
-                <p><strong>Severity Score:</strong> {case.severity_score}/100</p>
-            </div>
-            """, unsafe_allow_html=True)
+    if filtered_cases:
+        for case in filtered_cases:
+            # Determine color based on severity
+            severity_colors = {
+                "critical": "#d32f2f",
+                "high": "#f57c00",
+                "medium": "#1976d2",
+                "low": "#388e3c"
+            }
             
-            col1, col2, col3 = st.columns([1,1,2])
-            with col1:
-                if st.button(f"View Details", key=f"view_{case.id}"):
+            st.markdown(f'''
+            <div style="border-left: 5px solid {severity_colors[case.severity]}; 
+                        padding: 15px; margin: 10px 0; background: white; border-radius: 5px;">
+                <h4>{case.title} <span style="color: {severity_colors[case.severity]}; 
+                    font-weight: bold;">[{case.severity.upper()}]</span></h4>
+                <p><strong>Human Right:</strong> {case.human_right_affected} | 
+                <strong>AI System:</strong> {case.ai_system}</p>
+                <p><strong>People Affected:</strong> {case.people_affected:,} | 
+                <strong>Status:</strong> {case.status}</p>
+                <p>{case.description[:200]}...</p>
+            </div>
+            ''', unsafe_allow_html=True)
+            
+            col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 2])
+            with col_btn1:
+                if st.button("🔍 Investigate", key=f"invest_{case.id}"):
                     st.session_state.selected_case = case.id
                     st.rerun()
-            with col2:
-                if case.status != "resolved":
-                    new_status = st.selectbox("Update Status", 
-                                             ["open", "investigating", "escalated", "resolved"],
-                                             key=f"status_{case.id}",
-                                             index=["open", "investigating", "escalated", "resolved"].index(case.status))
-                    if new_status != case.status:
-                        case.status = new_status
-                        case.updated_at = datetime.datetime.now()
-                        st.rerun()
-            with col3:
-                if case.assigned_to:
-                    st.info(f"Assigned to: {case.assigned_to}")
+            with col_btn2:
+                if st.button("🤝 Advocate", key=f"adv_{case.id}"):
+                    st.session_state.advocacy_mode = case.id
+                    st.rerun()
+            with col_btn3:
+                if case.assigned_advocate:
+                    st.info(f"Assigned to: {case.assigned_advocate}")
                 else:
-                    if st.button("Assign to me", key=f"assign_{case.id}"):
-                        case.assigned_to = selected_assignee if selected_assignee != "Unassigned" else "You"
+                    if st.button("👤 Take This Case", key=f"take_{case.id}"):
+                        case.assigned_advocate = user_role
+                        st.success(f"Case assigned to {user_role}!")
                         st.rerun()
+    else:
+        st.info("No cases match your filters. Try generating a test case or adjusting filters.")
     
-    if not filtered_cases:
-        st.info("No cases match the current filters. Try generating a test case!")
-
-with tab2:  # Case Details
-    st.subheader("🔍 Case Investigation Panel")
-    
-    if 'selected_case' in st.session_state and st.session_state.selected_case:
+    # Case Details View
+    if 'selected_case' in st.session_state:
         case_id = st.session_state.selected_case
-        case = next((c for c in st.session_state.cases if c.id == case_id), None)
+        case = next((c for c in st.session_state.advocacy_cases if c.id == case_id), None)
         
         if case:
-            col1, col2 = st.columns([2, 1])
+            st.markdown("---")
+            st.subheader("🔍 Case Details")
             
-            with col1:
+            col_detail1, col_detail2 = st.columns([2, 1])
+            
+            with col_detail1:
                 st.markdown(f"### {case.title}")
                 st.markdown(f"**Case ID:** {case.id}")
-                st.markdown(f"**Platform:** {case.platform}")
-                st.markdown(f"**Category:** {case.category}")
-                st.markdown(f"**Priority:** {case.priority}")
+                st.markdown(f"**Human Right Affected:** {case.human_right_affected}")
+                st.markdown(f"**AI System:** {case.ai_system}")
+                st.markdown(f"**Severity:** {case.severity}")
+                st.markdown(f"**People Affected:** {case.people_affected:,}")
                 st.markdown(f"**Status:** {case.status}")
-                st.markdown(f"**Reported By:** {case.reported_by}")
-                st.markdown(f"**Created:** {case.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
-                st.markdown(f"**Last Updated:** {case.updated_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                st.markdown(f"**Reported:** {case.created_at.strftime('%Y-%m-%d %H:%M')}")
                 
                 st.markdown("---")
-                st.subheader("📝 Case Description")
+                st.markdown("#### 📝 Description")
                 st.write(case.description)
                 
-                st.markdown("---")
-                st.subheader("📊 Impact Assessment")
+                if case.advocacy_actions:
+                    st.markdown("#### ⚡ Advocacy Actions Taken")
+                    for action in case.advocacy_actions:
+                        st.info(f"• {action}")
                 
-                col_imp1, col_imp2, col_imp3 = st.columns(3)
-                with col_imp1:
-                    st.metric("Affected Users", f"{case.affected_users:,}")
-                with col_imp2:
-                    st.metric("Severity Score", f"{case.severity_score}/100")
-                with col_imp3:
-                    days_open = (datetime.datetime.now() - case.created_at).days
-                    st.metric("Days Open", days_open)
-                
-                # Timeline visualization using DataFrame
-                st.markdown("### 📅 Case Timeline")
-                timeline_data = pd.DataFrame({
-                    'Event': ['Case Opened', 'Initial Review', 'Investigation', 'Current'],
-                    'Date': [
-                        case.created_at.strftime("%Y-%m-%d"),
-                        (case.created_at + datetime.timedelta(hours=2)).strftime("%Y-%m-%d"),
-                        (case.created_at + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
-                        datetime.datetime.now().strftime("%Y-%m-%d")
-                    ]
-                })
-                st.dataframe(timeline_data, use_container_width=True)
+                if case.resolution:
+                    st.markdown("#### ✅ Resolution")
+                    st.success(case.resolution)
             
-            with col2:
-                st.subheader("🛠️ Quick Actions")
+            with col_detail2:
+                st.markdown("#### 🛠️ Take Action")
                 
-                # Status update
-                new_status = st.selectbox("Update Case Status", 
-                                         ["open", "investigating", "escalated", "resolved"],
-                                         index=["open", "investigating", "escalated", "resolved"].index(case.status))
+                # Update Status
+                new_status = st.selectbox("Update Status", 
+                                         ["reported", "investigating", "advocating", "resolved"],
+                                         index=["reported", "investigating", "advocating", "resolved"].index(case.status))
                 if new_status != case.status:
                     case.status = new_status
-                    case.updated_at = datetime.datetime.now()
                     st.success(f"Status updated to {new_status}")
                 
-                # Assignment
-                assign_to = st.selectbox("Assign Case", 
-                                        ["Unassigned", "Alex Chen", "Maria Garcia", "David Kim", "Sarah Johnson", "James Wilson"],
-                                        index=0 if not case.assigned_to else ["Unassigned", "Alex Chen", "Maria Garcia", "David Kim", "Sarah Johnson", "James Wilson"].index(case.assigned_to))
-                if assign_to != case.assigned_to:
-                    case.assigned_to = assign_to
-                    st.success(f"Assigned to {assign_to}")
+                # Add Advocacy Action
+                st.markdown("##### Add Advocacy Action")
+                action_type = st.selectbox("Action Type", list(ADVOCACY_ACTIONS.keys()))
+                if action_type:
+                    selected_action = st.selectbox("Select Action", ADVOCACY_ACTIONS[action_type])
+                    if st.button("Add Action"):
+                        case.advocacy_actions.append(selected_action)
+                        st.success(f"Added: {selected_action}")
+                        
+                        # Update metrics
+                        if "legal" in selected_action.lower():
+                            st.session_state.impact_metrics['legal_interventions'] += 1
+                        elif "campaign" in selected_action.lower():
+                            st.session_state.impact_metrics['awareness_campaigns'] += 1
                 
-                st.markdown("---")
-                
-                # Resolution input
-                st.subheader("✅ Resolution")
-                resolution_text = st.text_area("Enter resolution details:", case.resolution, height=150)
+                # Resolution
+                st.markdown("##### Record Resolution")
+                resolution_text = st.text_area("Resolution details:", case.resolution)
                 if resolution_text != case.resolution:
                     case.resolution = resolution_text
-                    if resolution_text and case.status != "resolved":
+                    if resolution_text:
                         case.status = "resolved"
+                        st.session_state.impact_metrics['people_protected'] += case.people_affected
                 
                 if st.button("Save Resolution"):
                     st.success("Resolution saved!")
-                
-                st.markdown("---")
-                
-                # Quick advocacy actions
-                st.subheader("⚡ Quick Advocacy")
-                action_type = st.selectbox("Action Type", list(ADVOCACY_TEMPLATES.keys()))
-                if action_type:
-                    selected_action = st.selectbox("Select Action", ADVOCACY_TEMPLATES[action_type])
-                    if st.button(f"Add {action_type} Action"):
-                        case.advocacy_actions.append({
-                            "type": action_type,
-                            "action": selected_action,
-                            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "status": "pending"
-                        })
-                        st.success(f"Added {action_type} action: {selected_action}")
-                
-                # View all advocacy actions
-                if case.advocacy_actions:
-                    st.markdown("#### 📋 Advocacy Actions")
-                    for i, action in enumerate(case.advocacy_actions):
-                        st.write(f"{i+1}. **{action['type']}**: {action['action']} ({action['date']})")
-        else:
-            st.warning("Case not found. Please select a valid case.")
-    else:
-        st.info("Select a case from the Dashboard to view details.")
 
-with tab3:  # Live Resolution
-    st.subheader("💬 Live Case Resolution Chat")
+with tab3:  # Advocacy Toolkit
+    st.subheader("⚖️ Human-Centered Advocacy Toolkit")
     
-    if 'selected_case' in st.session_state and st.session_state.selected_case:
-        case_id = st.session_state.selected_case
-        case = next((c for c in st.session_state.cases if c.id == case_id), None)
+    col_tool1, col_tool2 = st.columns(2)
+    
+    with col_tool1:
+        st.markdown("### 🎯 Strategy Builder")
         
-        if case:
-            st.markdown(f"### Chat for Case: {case.title}")
-            
-            # Chat interface
-            chat_container = st.container()
-            
-            with chat_container:
-                # Display chat history
-                for msg in case.chat_history:
-                    if msg["sender"] == "user":
-                        st.markdown(f'<div class="chat-user"><strong>You:</strong> {msg["message"]}</div>', unsafe_allow_html=True)
-                    else:
-                        st.markdown(f'<div class="chat-ai"><strong>AI Advisor:</strong> {msg["message"]}</div>', unsafe_allow_html=True)
-            
-            # Chat input
-            st.markdown("---")
-            col_chat1, col_chat2 = st.columns([4, 1])
-            
-            with col_chat1:
-                user_message = st.text_input("Type your message:", key="chat_input")
-            
-            with col_chat2:
-                if st.button("Send", use_container_width=True):
-                    if user_message:
-                        # Add user message
-                        case.chat_history.append({
-                            "sender": "user",
-                            "message": user_message,
-                            "time": datetime.datetime.now().strftime("%H:%M")
-                        })
-                        
-                        # Generate AI response (simulated)
-                        ai_responses = [
-                            "Based on similar cases, I recommend documenting all evidence systematically.",
-                            "Consider contacting the platform's ethics committee directly.",
-                            "Have you reviewed the platform's algorithmic accountability report?",
-                            "This might require escalating to regulatory authorities.",
-                            "I suggest conducting an independent impact assessment first.",
-                            "Let's identify all stakeholders affected by this issue."
-                        ]
-                        
-                        ai_response = random.choice(ai_responses)
-                        case.chat_history.append({
-                            "sender": "ai",
-                            "message": ai_response,
-                            "time": datetime.datetime.now().strftime("%H:%M")
-                        })
-                        
-                        st.rerun()
-            
-            # Quick response buttons
-            st.markdown("#### 💡 Quick Suggestions")
-            quick_responses = [
-                "What's the first step?",
-                "Who should we contact?",
-                "Documentation needed?",
-                "Legal implications?",
-                "Media strategy?"
+        target_right = st.selectbox("Select Human Right to Protect:", HUMAN_RIGHTS)
+        target_ai = st.selectbox("Target AI System:", AI_SYSTEMS)
+        
+        st.markdown("#### 📋 Recommended Actions")
+        
+        # Generate recommended actions based on selection
+        recommendations = {
+            "Right to Privacy": ["Legal", "Policy", "Public Awareness"],
+            "Right to Non-discrimination": ["Legal", "Technical", "Corporate Engagement"],
+            "Right to Freedom of Expression": ["Policy", "Public Awareness", "Corporate Engagement"],
+            "Right to Health": ["Policy", "Technical", "Corporate Engagement"]
+        }
+        
+        rec_type = recommendations.get(target_right, ["Legal", "Policy"])
+        
+        for action_type in rec_type[:2]:
+            with st.expander(f"{action_type} Actions"):
+                for action in ADVOCACY_ACTIONS[action_type]:
+                    if st.checkbox(action):
+                        st.info(f"Selected: {action}")
+        
+        if st.button("📋 Generate Advocacy Plan"):
+            st.success(f"Advocacy plan generated for protecting {target_right} against {target_ai}!")
+    
+    with col_tool2:
+        st.markdown("### 📚 Resource Library")
+        
+        resources = {
+            "Legal Templates": [
+                "Human Rights Complaint Template",
+                "Algorithmic Impact Assessment Guide",
+                "Transparency Request Letter",
+                "Legal Demand Letter"
+            ],
+            "Policy Tools": [
+                "AI Regulation Framework",
+                "Ethical Guidelines Checklist",
+                "Stakeholder Engagement Plan",
+                "Impact Assessment Methodology"
+            ],
+            "Community Tools": [
+                "Public Awareness Campaign Kit",
+                "Community Workshop Guide",
+                "Social Media Toolkit",
+                "Petition Template"
+            ],
+            "Technical Resources": [
+                "Bias Detection Framework",
+                "Privacy Impact Assessment",
+                "Algorithmic Audit Guide",
+                "Human-Centered Design Principles"
             ]
-            
-            cols = st.columns(len(quick_responses))
-            for idx, resp in enumerate(quick_responses):
-                with cols[idx]:
-                    if st.button(resp, key=f"quick_{idx}"):
-                        case.chat_history.append({
-                            "sender": "user",
-                            "message": resp,
-                            "time": datetime.datetime.now().strftime("%H:%M")
-                        })
-                        
-                        st.rerun()
-            
-            # Resolution progress
-            st.markdown("---")
-            st.subheader("📊 Resolution Progress")
-            
-            if not case.resolution:
-                resolution_steps = ["Investigation", "Evidence Collection", "Stakeholder Engagement", 
-                                   "Solution Design", "Implementation", "Verification"]
-                
-                current_step = min(len(case.chat_history) // 3, len(resolution_steps) - 1)
-                
-                # Create progress bar
-                progress = (current_step / (len(resolution_steps) - 1)) * 100
-                st.progress(int(progress))
-                st.write(f"Progress: {current_step + 1}/{len(resolution_steps)} steps completed")
-                
-                # Display steps
-                for i, step in enumerate(resolution_steps):
-                    status_icon = "✅" if i < current_step else "🔄" if i == current_step else "⏳"
-                    st.write(f"{status_icon} {step}")
-        else:
-            st.warning("Please select a case first.")
-    else:
-        st.info("Select a case from the Dashboard to start live resolution.")
-
-with tab4:  # Analytics
-    st.subheader("📈 Real-Time Analytics Dashboard")
-    
-    if st.session_state.cases:
-        # Convert cases to dataframe
-        cases_df = pd.DataFrame([c.to_dict() for c in st.session_state.cases])
+        }
         
-        col_a1, col_a2, col_a3, col_a4 = st.columns(4)
+        for category, items in resources.items():
+            with st.expander(f"📁 {category}"):
+                for item in items:
+                    if st.button(f"📄 {item}", key=f"res_{item}"):
+                        st.info(f"Downloading {item}...")
         
-        with col_a1:
-            active_cases = len([c for c in st.session_state.cases if c.status != "resolved"])
-            st.metric("Active Cases", active_cases)
-        
-        with col_a2:
-            urgent_cases = len([c for c in st.session_state.cases if c.priority == "urgent" and c.status != "resolved"])
-            st.metric("Urgent Cases", urgent_cases)
-        
-        with col_a3:
-            avg_severity = sum(c.severity_score for c in st.session_state.cases) / len(st.session_state.cases)
-            st.metric("Avg Severity", f"{avg_severity:.1f}/100")
-        
-        with col_a4:
-            resolution_rate = len([c for c in st.session_state.cases if c.status == "resolved"]) / len(st.session_state.cases) * 100
-            st.metric("Resolution Rate", f"{resolution_rate:.1f}%")
-        
-        # Charts using Streamlit built-in
-        col_chart1, col_chart2 = st.columns(2)
-        
-        with col_chart1:
-            st.subheader("📊 Cases by Category")
-            category_counts = cases_df['category'].value_counts()
-            # Create a simple bar chart
-            st.bar_chart(category_counts)
-            # Also show as table
-            with st.expander("View Category Data"):
-                st.dataframe(category_counts)
-        
-        with col_chart2:
-            st.subheader("📈 Cases by Priority")
-            priority_counts = cases_df['priority'].value_counts()
-            # Create dataframe for bar chart
-            priority_df = pd.DataFrame({
-                'Priority': priority_counts.index,
-                'Count': priority_counts.values
-            })
-            st.bar_chart(priority_df.set_index('Priority'))
-        
-        # Time-based analysis
-        st.subheader("⏱️ Resolution Time Analysis")
-        
-        if len(cases_df) > 1:
-            # Convert date strings to datetime
-            cases_df['created_at'] = pd.to_datetime(cases_df['created_at'])
-            cases_df['updated_at'] = pd.to_datetime(cases_df['updated_at'])
-            
-            # Calculate resolution time
-            resolved_cases = cases_df[cases_df['status'] == 'resolved'].copy()
-            if not resolved_cases.empty:
-                resolved_cases['resolution_hours'] = (resolved_cases['updated_at'] - resolved_cases['created_at']).dt.total_seconds() / 3600
-                
-                # Show statistics
-                st.write(f"**Average Resolution Time:** {resolved_cases['resolution_hours'].mean():.1f} hours")
-                st.write(f"**Fastest Resolution:** {resolved_cases['resolution_hours'].min():.1f} hours")
-                st.write(f"**Slowest Resolution:** {resolved_cases['resolution_hours'].max():.1f} hours")
-                
-                # Show histogram using bar chart
-                hist_data = pd.cut(resolved_cases['resolution_hours'], bins=10)
-                hist_counts = hist_data.value_counts().sort_index()
-                st.bar_chart(hist_counts)
-        
-        # Platform analysis
-        st.subheader("🖥️ Cases by Platform")
-        platform_counts = cases_df['platform'].value_counts().head(10)
-        
-        # Create horizontal bar chart using dataframe
-        platform_df = pd.DataFrame({
-            'Platform': platform_counts.index,
-            'Cases': platform_counts.values
-        })
-        # Reorder for horizontal display
-        platform_df = platform_df.sort_values('Cases', ascending=True)
-        st.bar_chart(platform_df.set_index('Platform'))
-        
-        # Real-time updates
         st.markdown("---")
-        st.subheader("🔄 Live Updates")
+        st.markdown("### 🌐 International Frameworks")
         
-        # Simulate real-time updates
-        if st.button("Simulate New Case Stream"):
-            with st.spinner("Streaming live case data..."):
-                for i in range(3):
-                    time.sleep(1)
-                    case_data = random.choice(PREDEFINED_CASES)
-                    case_id = f"LIVE-{st.session_state.case_counter}"
-                    new_case = AICase(
-                        case_id=case_id,
-                        title=f"[LIVE] {case_data['title']}",
-                        description=case_data["description"],
-                        category=case_data["category"],
-                        priority=case_data["priority"],
-                        reported_by="Live Stream",
-                        platform=case_data["platform"]
-                    )
-                    st.session_state.cases.append(new_case)
-                    st.session_state.case_counter += 1
-                    st.success(f"Live case added: {new_case.title}")
+        frameworks = [
+            "UN Guiding Principles on Business & Human Rights",
+            "OECD AI Principles",
+            "EU AI Act Guidelines",
+            "Universal Declaration of Human Rights"
+        ]
+        
+        for framework in frameworks:
+            st.write(f"• {framework}")
+
+with tab4:  # Impact Tracker
+    st.subheader("📈 Human Impact Tracker")
+    
+    # Impact Visualization
+    if st.session_state.advocacy_cases:
+        cases_df = pd.DataFrame([c.to_dict() for c in st.session_state.advocacy_cases])
+        
+        col_imp1, col_imp2 = st.columns(2)
+        
+        with col_imp1:
+            st.markdown("### 👥 People Impacted by Right")
+            right_counts = cases_df.groupby('human_right')['people_affected'].sum().sort_values(ascending=False)
+            st.bar_chart(right_counts)
+        
+        with col_imp2:
+            st.markdown("### ⚖️ Cases by AI System")
+            system_counts = cases_df['ai_system'].value_counts()
+            st.bar_chart(system_counts)
+        
+        # Cumulative Impact
+        st.markdown("### 📊 Cumulative Human Impact")
+        
+        # Simulate impact growth over time
+        impact_timeline = pd.DataFrame({
+            'Month': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            'People Protected': [1000, 5000, 15000, 30000, 45000, 60000],
+            'Policies Influenced': [0, 1, 3, 5, 8, 12],
+            'Legal Interventions': [0, 2, 5, 8, 12, 15]
+        })
+        
+        st.line_chart(impact_timeline.set_index('Month'))
+        
+        # Success Metrics
+        st.markdown("### 🎯 Your Advocacy Impact")
+        
+        user_cases = [c for c in st.session_state.advocacy_cases if c.assigned_advocate == user_role]
+        
+        if user_cases:
+            col_u1, col_u2, col_u3 = st.columns(3)
+            with col_u1:
+                st.metric("Your Cases", len(user_cases))
+            with col_u2:
+                total_impact = sum(c.people_affected for c in user_cases)
+                st.metric("People Impacted", f"{total_impact:,}")
+            with col_u3:
+                resolved = len([c for c in user_cases if c.status == "resolved"])
+                st.metric("Cases Resolved", resolved)
+        else:
+            st.info("Take on cases to build your impact profile!")
+    
+    # Global Impact Map
+    st.markdown("### 🌍 Global Human Rights & AI Landscape")
+    
+    global_data = pd.DataFrame({
+        'Region': ['North America', 'Europe', 'Asia', 'Africa', 'South America'],
+        'Active Cases': [25, 32, 45, 18, 22],
+        'Most Violated Right': ['Privacy', 'Non-discrimination', 'Expression', 'Health', 'Work'],
+        'Advocacy Success Rate': ['65%', '72%', '45%', '58%', '62%']
+    })
+    
+    st.dataframe(global_data, use_container_width=True)
+
+with tab5:  # Human-Centered AI Chat
+    st.subheader("💬 Human-Centered AI Advisory Chat")
+    
+    st.markdown("""
+    <div class="advocacy-action">
+        <h4>🤖 AI Assistant for Human Rights Advocacy</h4>
+        <p>Ask questions about human rights protections, advocacy strategies, or get guidance on specific cases.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize chat history
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+    
+    # Display chat history
+    chat_container = st.container()
+    with chat_container:
+        for message in st.session_state.chat_history:
+            if message['sender'] == 'user':
+                st.markdown(f'<div class="chat-human"><strong>You:</strong> {message["text"]}</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="chat-ai"><strong>AI Advocate:</strong> {message["text"]}</div>', unsafe_allow_html=True)
+    
+    # Chat input
+    st.markdown("---")
+    user_input = st.text_input("Ask about human rights and AI:", key="chat_input")
+    
+    col_chat1, col_chat2 = st.columns([4, 1])
+    with col_chat1:
+        if st.button("Send Message", use_container_width=True):
+            if user_input:
+                # Add user message
+                st.session_state.chat_history.append({
+                    'sender': 'user',
+                    'text': user_input,
+                    'time': datetime.datetime.now().strftime("%H:%M")
+                })
+                
+                # Generate AI response
+                ai_responses = {
+                    "human rights": "Human rights in AI include privacy, non-discrimination, and freedom from automated decision-making harm. Which specific right concerns you?",
+                    "privacy": "For privacy violations, consider: 1) Documenting the breach 2) Filing complaint with data protection authority 3) Demanding algorithmic transparency",
+                    "discrimination": "Algorithmic discrimination requires: 1) Collecting evidence of bias 2) Requesting impact assessment 3) Engaging affected communities 4) Legal action if systemic",
+                    "advocacy": "Effective advocacy involves: 1) Building coalitions 2) Using multiple channels (legal, media, policy) 3) Centering affected voices 4) Demanding accountability",
+                    "transparency": "For transparency issues: 1) File freedom of information requests 2) Demand explainability of AI decisions 3) Advocate for public algorithmic audits",
+                    "legal": "Legal options include: 1) Human rights complaints 2) Class action lawsuits 3) Regulatory petitions 4) International human rights mechanisms"
+                }
+                
+                # Find relevant response
+                ai_response = "I understand you're concerned about human rights and AI. Could you specify which aspect you'd like to discuss?"
+                for keyword, response in ai_responses.items():
+                    if keyword in user_input.lower():
+                        ai_response = response
+                        break
+                
+                # Add AI response
+                st.session_state.chat_history.append({
+                    'sender': 'ai',
+                    'text': ai_response,
+                    'time': datetime.datetime.now().strftime("%H:%M")
+                })
                 
                 st.rerun()
-    else:
-        st.info("No cases yet. Generate some test cases to see analytics!")
-
-with tab5:  # Advocacy Center
-    st.subheader("📢 AI Advocacy Action Center")
     
-    col_adv1, col_adv2 = st.columns([2, 1])
+    with col_chat2:
+        if st.button("Clear Chat", use_container_width=True):
+            st.session_state.chat_history = []
+            st.rerun()
     
-    with col_adv1:
-        st.markdown("### 🎯 Strategic Advocacy Planning")
-        
-        # Current issues visualization
-        st.markdown("#### 🔥 Current AI Ethics Hotspots")
-        
-        issues_data = pd.DataFrame({
-            'Issue': ['Algorithmic Bias', 'Privacy Violations', 'Misinformation', 
-                     'Autonomous Weapons', 'Job Displacement', 'Surveillance'],
-            'Severity': [95, 88, 76, 92, 68, 85],
-            'Media Attention': [85, 70, 95, 60, 75, 65]
-        })
-        
-        # Create a scatter plot using Streamlit's dataframe display
-        st.write("**Hotspots Matrix:**")
-        st.dataframe(issues_data, use_container_width=True)
-        
-        # Simple visualization using metric cards
-        st.markdown("#### 📊 Issue Priority Matrix")
-        for idx, row in issues_data.iterrows():
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"**{row['Issue']}**")
-            with col2:
-                st.metric("Severity", row['Severity'])
-        
-        # Advocacy campaign builder
-        st.markdown("### 🛠️ Build Advocacy Campaign")
-        
-        campaign_name = st.text_input("Campaign Name", "Stop Algorithmic Bias in Hiring")
-        
-        col_camp1, col_camp2 = st.columns(2)
-        with col_camp1:
-            target_platform = st.selectbox("Target Platform/Company", 
-                                          ["All Tech Companies", "FAANG", "Healthcare AI", 
-                                           "Financial Services", "Government", "Social Media"])
-        
-        with col_camp2:
-            campaign_type = st.selectbox("Campaign Type", 
-                                        ["Awareness", "Policy Change", "Legal Action", 
-                                         "Technical Reform", "Community Organizing"])
-        
-        st.markdown("#### 📝 Campaign Actions")
-        
-        selected_actions = []
-        for category, actions in ADVOCACY_TEMPLATES.items():
-            with st.expander(f"📋 {category} Actions"):
-                for action in actions:
-                    if st.checkbox(action, key=f"action_{action[:20]}"):
-                        selected_actions.append(f"{category}: {action}")
-        
-        if selected_actions:
-            st.markdown("#### ✅ Selected Actions")
-            for action in selected_actions:
-                st.write(f"• {action}")
-        
-        if st.button("🚀 Launch Campaign"):
-            st.success(f"Campaign '{campaign_name}' launched with {len(selected_actions)} actions!")
+    # Quick questions
+    st.markdown("#### 💡 Quick Questions")
     
-    with col_adv2:
-        st.markdown("### 📊 Advocacy Metrics")
-        
-        # Success metrics
-        st.metric("Campaigns Active", "12")
-        st.metric("Policy Changes", "3")
-        st.metric("Media Mentions", "245")
-        st.metric("Community Support", "15,234")
-        
-        st.markdown("---")
-        
-        st.markdown("### 📢 Recent Wins")
-        
-        wins = [
-            "Tech company agrees to independent AI audit",
-            "New legislation proposed for AI transparency",
-            "Major platform removes biased algorithm",
-            "Class action lawsuit settlement reached"
-        ]
-        
-        for win in wins:
-            st.success(f"✅ {win}")
-        
-        st.markdown("---")
-        
-        st.markdown("### 🔄 Live Advocacy Feed")
-        
-        # Simulated live feed
-        feed_items = [
-            "Breaking: New AI ethics guidelines released by EU",
-            "Protest organized outside TechCorp HQ",
-            "Op-ed published in NY Times about AI bias",
-            "Petition reaches 50,000 signatures",
-            "Congressional hearing on AI scheduled"
-        ]
-        
-        for item in feed_items:
-            st.info(f"📢 {item}")
+    quick_questions = [
+        "How to report AI privacy violation?",
+        "What are my rights against algorithmic bias?",
+        "How to start an advocacy campaign?",
+        "Legal options for AI discrimination?"
+    ]
+    
+    cols = st.columns(len(quick_questions))
+    for idx, question in enumerate(quick_questions):
+        with cols[idx]:
+            if st.button(question, key=f"qq_{idx}"):
+                st.session_state.chat_history.append({
+                    'sender': 'user',
+                    'text': question,
+                    'time': datetime.datetime.now().strftime("%H:%M")
+                })
+                
+                # Add predefined response
+                responses = [
+                    "To report privacy violations: 1) Document evidence 2) Contact data protection authority 3) File formal complaint",
+                    "Your rights include: non-discrimination, explanation of decisions, human oversight, and recourse mechanisms",
+                    "Start with: 1) Identify issue 2) Gather evidence 3) Build coalition 4) Choose advocacy channels 5) Track impact",
+                    "Legal options: 1) Discrimination lawsuits 2) Human rights complaints 3) Regulatory enforcement 4) Public interest litigation"
+                ]
+                
+                st.session_state.chat_history.append({
+                    'sender': 'ai',
+                    'text': responses[idx],
+                    'time': datetime.datetime.now().strftime("%H:%M")
+                })
+                
+                st.rerun()
 
 # Footer
 st.markdown("---")
 st.markdown(
     """
-    <div style='text-align: center; color: gray; padding: 20px;'>
-    <p>⚖️ <strong>AI Ethics Case Management System v2.0</strong> | Real-time monitoring and advocacy platform</p>
-    <p>For reporting AI ethics issues: ethics@ai-advocate.org | Hotline: 1-800-AI-ETHICS</p>
+    <div style='text-align: center; padding: 20px; color: #666;'>
+    <h4>🤝 Human AI Advocate Platform</h4>
+    <p>Protecting human dignity in the age of artificial intelligence</p>
+    <p>Need help? Contact: human-rights@ai-advocate.org | Emergency Hotline: 1-888-AI-HUMAN</p>
+    <p style='font-size: 0.9rem;'>Built with ❤️ for a human-centered AI future</p>
     </div>
     """,
     unsafe_allow_html=True
 )
 
-# Auto-refresh for real-time feel
-if st.checkbox("🔄 Enable auto-refresh (every 30 seconds)"):
-    time.sleep(30)
+# Real-time updates
+if st.checkbox("🔄 Enable live updates", value=False):
+    st.info("Live updates enabled - monitoring human rights developments...")
+    time.sleep(10)
     st.rerun()
